@@ -3,30 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
 <title>MouseKeysFX</title>
 <style>
 :root{
   --bg:#0e1013; --panel:#161a1f; --panel2:#1d2229; --line:#2a313a;
   --text:#e6e9ee; --muted:#8b95a3; --accent:#f5a524; --accent-ink:#1a1204;
   --wave:#6f8197; --key:#5ec8e5; --space:#f5a524; --enter:#e87bd0; --head:#ffffff;
+  color-scheme:dark;
 }
 @media (prefers-color-scheme: light){
-  :root{
+  :root:not([data-theme="dark"]){
     --bg:#f3f4f6; --panel:#ffffff; --panel2:#eef0f3; --line:#d9dde3;
     --text:#14181d; --muted:#667180; --accent:#c77d00; --accent-ink:#ffffff;
     --wave:#7c8da1; --key:#0b8fb3; --space:#c77d00; --enter:#c2399c; --head:#14181d;
+    color-scheme:light;
   }
 }
+:root[data-theme="light"]{
+  --bg:#f3f4f6; --panel:#ffffff; --panel2:#eef0f3; --line:#d9dde3;
+  --text:#14181d; --muted:#667180; --accent:#c77d00; --accent-ink:#ffffff;
+  --wave:#7c8da1; --key:#0b8fb3; --space:#c77d00; --enter:#c2399c; --head:#14181d;
+  color-scheme:light;
+}
 *{box-sizing:border-box}
-html{color-scheme:dark light}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding:16px;max-width:1200px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));max-width:1200px;margin:0 auto}
 .brand h1{margin:0;font-size:20px;letter-spacing:.2px}
 .brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
 .tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
 .tabs button{border:0;background:none;color:var(--muted);padding:8px 22px;border-radius:7px;font:inherit;font-weight:600;cursor:pointer}
 .tabs button[aria-selected=true]{background:var(--accent);color:var(--accent-ink)}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:16px;max-width:1200px;margin:0 auto;padding:0 16px 40px;align-items:start}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:16px;max-width:1200px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));align-items:start}
 @media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.stage{order:-1}}
 .stage{position:sticky;top:12px;display:grid;gap:16px}
 @media (max-width:900px){.stage{position:static}}
@@ -496,10 +504,32 @@ function encodeWAV(buf,bits,mono,norm){
   }
   return new Blob([ab],{type:'audio/wav'});
 }
-function download(blob,name){
+const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+async function zipStore(name,blob){
+  const data=new Uint8Array(await blob.arrayBuffer()), nm=new TextEncoder().encode(name);
+  let crc=0xFFFFFFFF; for(let i=0;i<data.length;i++) crc=crcTable[(crc^data[i])&255]^(crc>>>8); crc=(crc^0xFFFFFFFF)>>>0;
+  const lh=new DataView(new ArrayBuffer(30)), ch=new DataView(new ArrayBuffer(46)), eo=new DataView(new ArrayBuffer(22));
+  lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true); lh.setUint16(26,nm.length,true);
+  ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true); ch.setUint16(28,nm.length,true);
+  const cdOff=30+nm.length+data.length, cdLen=46+nm.length;
+  eo.setUint32(0,0x06054b50,true); eo.setUint16(8,1,true); eo.setUint16(10,1,true); eo.setUint32(12,cdLen,true); eo.setUint32(16,cdOff,true);
+  return new Blob([lh,nm,data,ch,nm,eo],{type:'application/zip'});
+}
+// Inside a claude.ai artifact plain downloads are blocked and WAV is not an allowed type, so use the
+// downloads capability and wrap WAV in a zip there. Everywhere else a normal download link is used.
+async function download(blob,name){
+  let dl=null;
+  try{ dl=window.claude&&await window.claude.use('downloads'); }catch(e){}
+  if(dl){
+    if(name.endsWith('.wav')){ blob=await zipStore(name,blob); name=name.replace(/\.wav$/,'.zip'); }
+    try{ await dl.save({filename:name,data:blob}); }
+    catch(e){ if(e&&e.code==='declined') return null; throw e; }
+    return name;
+  }
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  return name;
 }
 function setHint(msg){ $('exportHint').textContent=msg; }
 async function doExport(one){
@@ -507,8 +537,8 @@ async function doExport(one){
   try{
     const r = one ? await renderOne(tab,x.sr) : await renderSeq(tab,x.sr);
     const name = `mousekeysfx-${tab==='mouse'?'click':'typing'}${one?'-single'+(tab==='kb'?'-'+state.kb.single:''):''}.wav`;
-    download(encodeWAV(r.buffer,x.bits,x.ch==='1',x.norm),name);
-    setHint(`Saved ${name} (${r.duration.toFixed(2)} s, ${x.sr/1000} kHz).`);
+    const saved=await download(encodeWAV(r.buffer,x.bits,x.ch==='1',x.norm),name);
+    setHint(saved?`Saved ${saved} (${r.duration.toFixed(2)} s, ${x.sr/1000} kHz).`:'Save cancelled.');
   }catch(err){ setHint('Export failed: '+err.message); }
 }
 async function exportCsv(){
@@ -518,8 +548,8 @@ async function exportCsv(){
     const label = tab==='mouse' ? 'click' : e.kind==='space' ? 'Space' : e.kind==='enter' ? 'Enter' : e.c;
     rows.push(`${e.t.toFixed(4)},${e.kind},"${label.replace(/"/g,'""')}"`);
   }
-  download(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}),`mousekeysfx-${tab==='mouse'?'click':'typing'}-markers.csv`);
-  setHint(`Saved ${r.events.length} markers.`);
+  const saved=await download(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}),`mousekeysfx-${tab==='mouse'?'click':'typing'}-markers.csv`);
+  setHint(saved?`Saved ${r.events.length} markers.`:'Save cancelled.');
 }
 
 /* ---------- live audio ---------- */
@@ -687,6 +717,7 @@ $('kbPad').addEventListener('keyup',e=>{ const ev=held.get(e.code); if(ev){ held
 window.addEventListener('resize',()=>drawScope(cur?ac.currentTime-cur.t0:undefined));
 
 /* ---------- init ---------- */
+document.body.dataset.tab=tab;
 syncUI();
 $('btnPlay').textContent='▶ Play click sequence';
 $('legend').innerHTML=`<span><i style="background:var(--key)"></i>click</span>`;
