@@ -137,9 +137,9 @@ const dB = x => Math.pow(10,x/20);
 
 /* ---------- state ---------- */
 const DEF = {
-  mouse:{preset:'Classic',speed:55,smooth:35,tone:50,body:40,release:60,hold:70,human:30,
+  mouse:{preset:'Magic Mouse',speed:65,smooth:65,tone:40,body:55,click:15,release:25,hold:90,human:30,
          repeat:3,interval:450,double:false,dblgap:110,vol:80,room:10,seed:3},
-  kb:{preset:'Tactile',speed:55,smooth:45,tone:45,depth:55,click:40,release:45,human:35,
+  kb:{preset:'Magic Keyboard',speed:70,smooth:55,tone:50,depth:30,click:0,release:35,human:30,
       spaceBoost:4,spacePitch:-5,enterBoost:3,enterPitch:-3,rattle:40,
       text:'Hello world,\nthis is a synthetic typing simulation.\nEvery space and enter has its own weight.\n',
       duration:18,rhythm:40,burst:35,pauseSpace:40,pauseEnter:200,pausePunct:80,seed:7,
@@ -148,24 +148,23 @@ const DEF = {
 };
 const PRESETS = {
   mouse:{
-    Classic:  {speed:55,smooth:35,tone:50,body:40,release:60,hold:70,human:30},
-    Soft:     {speed:40,smooth:80,tone:35,body:50,release:35,hold:80,human:30},
-    Sharp:    {speed:85,smooth:5, tone:70,body:20,release:70,hold:55,human:25},
-    Trackpad: {speed:70,smooth:70,tone:20,body:85,release:40,hold:60,human:25},
-    Optical:  {speed:75,smooth:45,tone:62,body:15,release:45,hold:60,human:25},
-    Gaming:   {speed:90,smooth:15,tone:75,body:25,release:80,hold:45,human:20}
+    'Magic Mouse':     {speed:65,smooth:65,tone:40,body:55,click:15,release:25,hold:90,human:30},
+    'MacBook trackpad':{speed:70,smooth:60,tone:30,body:70,click:5, release:55,hold:60,human:25},
+    'Microswitch':     {speed:60,smooth:25,tone:55,body:35,click:75,release:60,hold:70,human:30},
+    'Quiet office':    {speed:55,smooth:80,tone:40,body:40,click:35,release:30,hold:80,human:30},
+    Gaming:            {speed:85,smooth:10,tone:68,body:20,click:85,release:70,hold:45,human:20}
   },
   kb:{
-    'Linear thock':{speed:45,smooth:60,tone:35,depth:75,click:5,  release:40,human:35},
-    Tactile:       {speed:55,smooth:45,tone:45,depth:55,click:40, release:45,human:35},
-    'Clicky blue': {speed:75,smooth:15,tone:60,depth:35,click:100,release:60,human:35},
-    Membrane:      {speed:35,smooth:80,tone:30,depth:30,click:0,  release:30,human:40},
-    Laptop:        {speed:85,smooth:35,tone:65,depth:15,click:10, release:25,human:30},
-    Typewriter:    {speed:60,smooth:10,tone:40,depth:80,click:70, release:70,human:50}
+    'Magic Keyboard':   {speed:70,smooth:55,tone:50,depth:30,click:0, release:35,human:30},
+    'MacBook Pro':      {speed:74,smooth:50,tone:55,depth:25,click:0, release:40,human:30},
+    'MacBook butterfly':{speed:82,smooth:25,tone:68,depth:20,click:10,release:50,human:30},
+    'Linear thock':     {speed:45,smooth:60,tone:35,depth:75,click:5, release:40,human:35},
+    Tactile:            {speed:55,smooth:45,tone:45,depth:55,click:40,release:45,human:35},
+    'Clicky blue':      {speed:75,smooth:15,tone:60,depth:35,click:100,release:60,human:35}
   }
 };
 const state = JSON.parse(JSON.stringify(DEF));
-const STORE = 'mousekeysfx.v1';
+const STORE = 'mousekeysfx.v2';
 try{
   const saved = JSON.parse(localStorage.getItem(STORE)||'null');
   if(saved) for(const g in state) Object.assign(state[g], saved[g]||{});
@@ -175,7 +174,7 @@ let tab = 'mouse';
 
 /* ---------- controls UI ---------- */
 const S = (k,l,min,max,u='',hint='',step=1) => ({k,l,min,max,u,hint,step});
-const SOUND_KEYS = {mouse:['speed','smooth','tone','body','release','hold','human'],
+const SOUND_KEYS = {mouse:['speed','smooth','tone','body','click','release','hold','human'],
                     kb:['speed','smooth','tone','depth','click','release','human']};
 const SECT = {
   mouse:[
@@ -184,6 +183,7 @@ const SECT = {
       S('smooth','Smoothness',0,100,'%','Harsh and crackly ↔ round and soft'),
       S('tone','Tone',0,100,'%','Low and dull ↔ high and bright'),
       S('body','Body',0,100,'%','Low thump under the click'),
+      S('click','Switch click',0,100,'%','Sharp micro-switch snap on top of the shell sound'),
       S('release','Release click',0,100,'%','Level of the button-up click'),
       S('hold','Hold time',20,250,' ms','Time between press and release'),
       S('human','Humanize',0,100,'%','Random variation per click')]],
@@ -262,50 +262,6 @@ function syncUI(){
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 const gauss = r => Math.sqrt(-2*Math.log(1-r()))*Math.cos(2*Math.PI*r());
 
-const noiseCache = new Map();
-function getNoise(ctx){
-  let b = noiseCache.get(ctx.sampleRate);
-  if(!b){
-    b = ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
-    const d=b.getChannelData(0), r=mulberry32(1234);
-    for(let i=0;i<d.length;i++) d[i]=r()*2-1;
-    noiseCache.set(ctx.sampleRate,b);
-  }
-  return b;
-}
-function env(g,t,peak,att,dur){
-  const p=g.gain;
-  p.setValueAtTime(0.0001,t);
-  p.linearRampToValueAtTime(Math.max(peak,0.0002),t+att);
-  p.exponentialRampToValueAtTime(0.0001,t+att+dur);
-}
-function noise(ctx,out,t,o){
-  const src=ctx.createBufferSource(); src.buffer=getNoise(ctx);
-  const f=ctx.createBiquadFilter(); f.type=o.type||'bandpass';
-  f.frequency.value=clamp(o.freq,40,ctx.sampleRate*0.45); f.Q.value=o.q||1;
-  const g=ctx.createGain(); const att=o.att||0.0004;
-  env(g,t,o.gain,att,o.dur);
-  src.connect(f); f.connect(g); g.connect(out);
-  src.start(t,o.off||0,att+o.dur+0.01);
-}
-function tone(ctx,out,t,o){
-  const osc=ctx.createOscillator(); osc.type=o.type||'sine';
-  const att=o.att||0.0005;
-  osc.frequency.setValueAtTime(clamp(o.f0,20,ctx.sampleRate*0.45),t);
-  osc.frequency.exponentialRampToValueAtTime(clamp(o.f1,20,ctx.sampleRate*0.45),t+o.dur*0.6);
-  const g=ctx.createGain(); env(g,t,o.gain,att,o.dur);
-  osc.connect(g); g.connect(out);
-  osc.start(t); osc.stop(t+att+o.dur+0.02);
-}
-function hitBus(ctx,dest,o){
-  const g=ctx.createGain(); g.gain.value=o.gain;
-  const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=clamp(o.lp,500,ctx.sampleRate*0.45); f.Q.value=0.5;
-  g.connect(f);
-  if(o.pan && ctx.createStereoPanner){
-    const p=ctx.createStereoPanner(); p.pan.value=clamp(o.pan,-1,1); f.connect(p); p.connect(dest);
-  } else f.connect(dest);
-  return g;
-}
 function makeIR(ctx,len){
   const n=Math.floor(ctx.sampleRate*len), b=ctx.createBuffer(2,n,ctx.sampleRate), r=mulberry32(99);
   for(let c=0;c<2;c++){
@@ -332,20 +288,6 @@ function makeChain(ctx,p){
 /* ---------- mouse voice ---------- */
 function mouseVar(rng,p){
   return {vel:clamp(1+gauss(rng)*p.human/100*0.15,0.6,1.35), pit:1+gauss(rng)*p.human/100*0.03};
-}
-function mouseHit(ctx,dest,t,p,e,rng,up){
-  const S=Math.pow(2,(50-p.speed)/50*1.2)*(up?0.75:1);
-  const sm=p.smooth/100;
-  const fB=250*Math.pow(2,p.tone/100*3.6)*e.pit*(up?1.22:1);
-  const lp=22000*Math.pow(0.12,sm);
-  const vel=e.vel*(up?p.release/100*0.7:1);
-  if(vel<0.01) return;
-  const bus=hitBus(ctx,dest,{gain:0.8*vel,lp});
-  const att=0.0003+0.003*sm;
-  noise(ctx,bus,t,{dur:0.007*S,att,gain:0.7*(1-0.55*sm),freq:Math.min(9000,fB*3.2),q:0.9,off:rng()*0.9});
-  tone(ctx,bus,t,{f0:fB*1.25,f1:fB*0.6,dur:0.045*S,att,gain:0.6,type:'triangle'});
-  tone(ctx,bus,t,{f0:fB*2.76,f1:fB*2.6,dur:0.02*S,att,gain:0.16*(1-0.7*sm)});
-  if(!up && p.body>0) tone(ctx,bus,t,{f0:130,f1:55,dur:0.06*S,att:0.001,gain:p.body/100*0.9});
 }
 function mouseEvents(p){
   const rng=mulberry32(p.seed*104729+3), evs=[], lead=0.1;
@@ -376,42 +318,6 @@ function keyEvent(c,rng,p){
     pan:(keyX(c,kind)-0.5)*2*p.spread/100,
     hold:0.04+rng()*0.05};
 }
-function keyHit(ctx,dest,t,p,e,rng,up){
-  const S=Math.pow(2,(50-p.speed)/50*1.2);
-  const sm=p.smooth/100;
-  const big=e.kind!=='key';
-  const m = e.kind==='space' ? {f:Math.pow(2,p.spacePitch/12),dec:1.5,gain:dB(p.spaceBoost),thump:1.6}
-          : e.kind==='enter' ? {f:Math.pow(2,p.enterPitch/12),dec:1.25,gain:dB(p.enterBoost),thump:1.3}
-          : {f:1,dec:1,gain:1,thump:1};
-  const f=120*Math.pow(2,p.tone/100*3.2)*e.pit*m.f;
-  const dec=S*m.dec;
-  const lp=16000*Math.pow(0.15,sm);
-  const att=0.0004+0.002*sm;
-  const depth=p.depth/100;
-  if(!up){
-    const bus=hitBus(ctx,dest,{gain:0.7*e.vel*m.gain,lp,pan:e.pan});
-    if(p.click>0){
-      const c=p.click/100, cf=(2500+p.tone*45)*e.pit;
-      noise(ctx,bus,t,{dur:0.004*S,gain:c*0.8,freq:cf,q:1.6,off:rng()*0.9});
-      if(p.click>70) noise(ctx,bus,t+0.006,{dur:0.003*S,gain:c*0.5,freq:cf*1.45,q:2,off:rng()*0.9});
-      if(p.click>50) tone(ctx,bus,t+0.001,{f0:cf*1.2,f1:cf*1.15,dur:0.05,gain:(p.click-50)/50*0.07});
-    }
-    noise(ctx,bus,t+0.002,{dur:0.014*dec,att,gain:0.9,type:'lowpass',freq:f*2.2,q:0.7,off:rng()*0.9});
-    noise(ctx,bus,t+0.002,{dur:0.02*dec,att,gain:0.25,freq:f*3.5,q:1.2,off:rng()*0.9});
-    tone(ctx,bus,t+0.002,{f0:f,f1:f*0.55,dur:0.09*dec*(0.6+depth*0.8),att,gain:0.55,type:'triangle'});
-    if(depth>0) tone(ctx,bus,t+0.002,{f0:Math.max(55,f*0.4),f1:Math.max(40,f*0.25),dur:0.08*dec,att:0.001,gain:depth*0.8*m.thump});
-    if(big && p.rattle>0){
-      const n=e.kind==='space'?3:2, r=p.rattle/100;
-      for(let i=0;i<n;i++)
-        noise(ctx,bus,t+0.012+i*(0.006+rng()*0.01),{dur:0.003,gain:0.22*r,freq:5000+rng()*1500,q:3,off:rng()*0.9});
-    }
-  } else if(p.release>0){
-    const r=p.release/100;
-    const bus=hitBus(ctx,dest,{gain:0.55*e.vel*Math.sqrt(m.gain),lp,pan:e.pan});
-    noise(ctx,bus,t,{dur:0.003*S,gain:r*0.5,freq:(3500+p.tone*30)*e.pit,q:1.4,off:rng()*0.9});
-    tone(ctx,bus,t,{f0:f*1.5,f1:f*1.2,dur:0.03*S*m.dec,gain:r*0.25,type:'triangle'});
-  }
-}
 function typingEvents(p){
   const rng=mulberry32(p.seed*7919+1);
   const chars=[...p.text.replace(/\r/g,'')], n=chars.length;
@@ -435,31 +341,133 @@ function typingEvents(p){
   return evs;
 }
 
-/* ---------- rendering ---------- */
-const hitFn = g => g==='mouse' ? mouseHit : keyHit;
-async function renderEvents(g,p,evs,sr,tail=0.8){
-  // Hits are rendered dry in short windows (a long graph full of finished voices renders very slowly),
-  // summed in JS, then run once through the master chain.
-  const end=evs.reduce((m,e)=>Math.max(m,e.t+e.hold),0)+tail+(p.room>0?0.4:0);
-  const total=Math.max(1,Math.ceil(end*sr)), mix=[new Float32Array(total),new Float32Array(total)];
-  const rng=mulberry32(p.seed*31+5), hit=hitFn(g), WIN=1, groups=new Map();
-  for(const e of evs){ const k=Math.floor(e.t/WIN); (groups.get(k)||groups.set(k,[]).get(k)).push(e); }
-  const jobs=[];
-  for(const [k,list] of groups){
-    const off=k*WIN, len=Math.min(total-Math.floor(off*sr),Math.ceil((WIN+1)*sr));
-    if(len<=0) continue;
-    const oc=new OfflineAudioContext(2,len,sr), dry=oc.createGain(); dry.connect(oc.destination);
-    for(const e of list){ hit(oc,dry,e.t-off,p,e,rng,false); hit(oc,dry,e.t-off+e.hold,p,e,rng,true); }
-    jobs.push(oc.startRendering().then(b=>{
-      const o=Math.floor(off*sr);
-      for(let c=0;c<2;c++){ const d=b.getChannelData(c), m=mix[c]; for(let i=0;i<d.length;i++) m[o+i]+=d[i]; }
-    }));
+/* ---------- sample-level synthesis ----------
+   Every hit is built sample by sample from damped resonant modes (plastic shell, keycap, plate, switch leaf)
+   plus short filtered noise for the contact. There are no pitch sweeps, which is what made the first
+   version sound like interface beeps. */
+function filtInPlace(x,type,f,q,sr){
+  const w=2*Math.PI*Math.min(f,sr*0.45)/sr, c=Math.cos(w), s=Math.sin(w), al=s/(2*q), a0=1+al;
+  let b0,b1,b2;
+  if(type==='lowpass'){b0=(1-c)/2;b1=1-c;b2=b0;}
+  else if(type==='highpass'){b0=(1+c)/2;b1=-(1+c);b2=b0;}
+  else{b0=al;b1=0;b2=-al;}
+  b0/=a0;b1/=a0;b2/=a0; const a1=-2*c/a0, a2=(1-al)/a0;
+  let x1=0,x2=0,y1=0,y2=0;
+  for(let i=0;i<x.length;i++){
+    const v=x[i], y=b0*v+b1*x1+b2*x2-a1*y1-a2*y2;
+    x2=x1;x1=v;y2=y1;y1=y;x[i]=y;
   }
-  await Promise.all(jobs);
-  const dryBuf=new AudioBuffer({numberOfChannels:2,length:total,sampleRate:sr});
-  dryBuf.copyToChannel(mix[0],0); dryBuf.copyToChannel(mix[1],1);
+}
+const newHit=(sr,dur)=>({sr,n:Math.ceil(dur*sr),d:new Float32Array(Math.ceil(dur*sr))});
+function addMode(h,t,f,tau,amp,rng,att=0.0002){
+  const sr=h.sr, i0=Math.floor(t*sr);
+  if(i0>=h.n||amp<=0) return;
+  const len=Math.min(h.n-i0,Math.ceil(tau*7*sr)), w=2*Math.PI*f*(1+(rng()-0.5)*0.04)/sr;
+  const cw=Math.cos(w), sw=Math.sin(w), dec=Math.exp(-1/(tau*sr)), na=Math.max(1,att*sr);
+  const ph=rng()*6.283; let s=Math.sin(ph), c=Math.cos(ph), env=amp*(0.9+rng()*0.2);
+  for(let i=0;i<len;i++){
+    h.d[i0+i]+=env*(i<na?i/na:1)*s;
+    const ns=s*cw+c*sw; c=c*cw-s*sw; s=ns; env*=dec;
+  }
+}
+function burst(h,t,dur,amp,rng,type,f,q,att=0.0002){
+  const sr=h.sr, i0=Math.floor(t*sr), len=Math.min(h.n-i0,Math.ceil(dur*sr*5));
+  if(len<=0||amp<=0) return;
+  const x=new Float32Array(len), tau=dur/2.2, na=Math.max(1,att*sr);
+  for(let i=0;i<len;i++) x[i]=(rng()*2-1)*Math.exp(-i/sr/tau)*(i<na?i/na:1);
+  if(type) filtInPlace(x,type,f,q,sr);
+  let pk=0; for(let i=0;i<len;i++) pk=Math.max(pk,Math.abs(x[i]));
+  if(pk<1e-9) return;
+  const k=amp/pk; for(let i=0;i<len;i++) h.d[i0+i]+=x[i]*k;
+}
+function finishHit(h,sm,target,vel){
+  const lp=16000*Math.pow(0.2,sm)*clamp(vel,0.6,1.3);
+  filtInPlace(h.d,'lowpass',lp,0.7,h.sr);
+  let pk=0; for(let i=0;i<h.n;i++) pk=Math.max(pk,Math.abs(h.d[i]));
+  if(pk<1e-9) return null;
+  const k=target/pk, fade=Math.min(96,h.n);
+  for(let i=0;i<h.n;i++) h.d[i]*=k*(i>h.n-fade?(h.n-i)/fade:1);
+  return h.d;
+}
+const toneScale=p=>Math.pow(2,(p.tone-50)/50*1.1);
+
+function mouseSynth(p,e,rng,up,sr){
+  const S=Math.pow(2,(50-p.speed)/50*1.2), c=p.click/100, body=p.body/100, F=toneScale(p)*e.pit;
+  const h=newHit(sr,0.35);
+  if(!up){
+    if(c>0){
+      burst(h,0,0.0012*S,c*0.9,rng,'bandpass',3600*F,1.3);
+      addMode(h,0,3300*F,0.0035*S,c*0.45,rng); addMode(h,0,5100*F,0.0025*S,c*0.3,rng);
+    }
+    addMode(h,0.0006,640*F,0.013*S,0.7,rng); addMode(h,0.0006,1210*F,0.009*S,0.45,rng); addMode(h,0.0006,1780*F,0.006*S,0.28,rng);
+    burst(h,0.0004,0.004*S,0.5,rng,'lowpass',900*F,0.8,0.0004);
+    addMode(h,0.001,175*Math.sqrt(F),0.028*S,body*0.9,rng,0.0008);
+  } else {
+    if(c>0) burst(h,0,0.001*S,c*0.6,rng,'bandpass',4200*F,1.3);
+    addMode(h,0.0005,720*F,0.008*S,0.7,rng); addMode(h,0.0005,1350*F,0.006*S,0.4,rng);
+    burst(h,0.0004,0.003*S,0.35,rng,'lowpass',1000*F,0.8,0.0004);
+    addMode(h,0.001,210*Math.sqrt(F),0.016*S,body*0.4,rng,0.0008);
+  }
+  const target=0.55*e.vel*(up?p.release/100*0.7:1);
+  return target<0.005?null:finishHit(h,p.smooth/100,target,e.vel);
+}
+
+function keySynth(p,e,rng,up,sr){
+  const S=Math.pow(2,(50-p.speed)/50*1.2), depth=p.depth/100, c=p.click/100, big=e.kind!=='key';
+  const m = e.kind==='space' ? {f:Math.pow(2,p.spacePitch/12),dec:1.5,gain:dB(p.spaceBoost),thump:1.6}
+          : e.kind==='enter' ? {f:Math.pow(2,p.enterPitch/12),dec:1.25,gain:dB(p.enterBoost),thump:1.3}
+          : {f:1,dec:1,gain:1,thump:1};
+  const F=toneScale(p)*e.pit*m.f, D=S*m.dec, h=newHit(sr,0.45), pl=0.3+0.9*depth;
+  let target;
+  if(!up){
+    // fingertip on keycap, keycap ringing, then plate and case after bottom-out
+    burst(h,0,0.003*D,0.55,rng,'bandpass',1700*F,0.8,0.0004);
+    addMode(h,0.0003,1650*F,0.007*D,0.5,rng,0.0004);
+    addMode(h,0.0003,2480*F,0.005*D,0.32,rng,0.0004);
+    addMode(h,0.0003,3720*F,0.003*D,0.18,rng,0.0004);
+    addMode(h,0.0012,380*F,0.022*D,0.8*pl,rng,0.0008);
+    addMode(h,0.0012,720*F,0.014*D,0.45*pl,rng,0.0008);
+    addMode(h,0.0012,1150*F,0.009*D,0.25*pl,rng,0.0008);
+    addMode(h,0.0012,110*Math.pow(F,0.6),0.035*D,depth*0.9*m.thump,rng,0.001);
+    if(c>0){
+      burst(h,0,0.0012*S,c*0.9,rng,'bandpass',4800*F,1.4);
+      addMode(h,0,3100*F,0.003*S,c*0.5,rng); addMode(h,0,4700*F,0.0022*S,c*0.3,rng);
+      if(p.click>70){ burst(h,0.0055,0.001*S,c*0.6,rng,'bandpass',6200*F,1.6); addMode(h,0.0055,5600*F,0.002*S,c*0.3,rng); }
+    }
+    if(big&&p.rattle>0){
+      const n=e.kind==='space'?3:2, r=p.rattle/100;
+      for(let i=0;i<n;i++) burst(h,0.012+i*0.007+rng()*0.01,0.003,0.22*r,rng,'bandpass',3200+rng()*1500,2.5);
+    }
+    target=0.55*e.vel*m.gain;
+  } else {
+    if(p.release<=0) return null;
+    burst(h,0,0.002*S,0.5,rng,'bandpass',(3200+p.tone*20)*e.pit,1.2);
+    addMode(h,0.0002,1900*F,0.005*D,0.4,rng,0.0003);
+    addMode(h,0.0006,520*F,0.012*D,0.45,rng,0.0006);
+    target=0.55*e.vel*Math.sqrt(m.gain)*p.release/100*0.7;
+  }
+  return finishHit(h,p.smooth/100,target,e.vel);
+}
+const synthHit=(g,p,e,rng,up,sr)=>(g==='mouse'?mouseSynth:keySynth)(p,e,rng,up,sr);
+function panGains(pan){ const a=(clamp(pan||0,-1,1)+1)*Math.PI/4; return [Math.cos(a),Math.sin(a)]; }
+
+/* ---------- rendering ---------- */
+async function renderEvents(g,p,evs,sr,tail=0.8){
+  const end=evs.reduce((m,e)=>Math.max(m,e.t+e.hold),0)+tail+(p.room>0?0.4:0);
+  const total=Math.max(1,Math.ceil(end*sr)), L=new Float32Array(total), R=new Float32Array(total);
+  const rng=mulberry32(p.seed*31+5);
+  for(const e of evs){
+    const [gl,gr]=panGains(e.pan);
+    for(const up of [false,true]){
+      const d=synthHit(g,p,e,rng,up,sr); if(!d) continue;
+      const o=Math.floor((e.t+(up?e.hold:0))*sr), n=Math.min(d.length,total-o);
+      for(let i=0;i<n;i++){ L[o+i]+=d[i]*gl; R[o+i]+=d[i]*gr; }
+    }
+  }
+  const dry=new AudioBuffer({numberOfChannels:2,length:total,sampleRate:sr});
+  dry.copyToChannel(L,0); dry.copyToChannel(R,1);
   const oc=new OfflineAudioContext(2,total,sr), src=oc.createBufferSource();
-  src.buffer=dryBuf; src.connect(makeChain(oc,p).input); src.start();
+  src.buffer=dry; src.connect(makeChain(oc,p).input); src.start();
   return {buffer:await oc.startRendering(),events:evs,duration:end};
 }
 const renderSeq = (g,sr) => renderEvents(g,state[g],g==='mouse'?mouseEvents(state[g]):typingEvents(state[g]),sr);
@@ -569,8 +577,15 @@ function liveChain(g){
   return live.chain.input;
 }
 const liveRng = Math.random;
-function liveMouse(e,up){ const a=getAC(); mouseHit(a,liveChain('mouse'),a.currentTime+0.005,state.mouse,e,liveRng,up); }
-function liveKey(e,up){ const a=getAC(); keyHit(a,liveChain('kb'),a.currentTime+0.005,state.kb,e,liveRng,up); }
+function livePlay(g,e,up){
+  const a=getAC(), d=synthHit(g,state[g],e,liveRng,up,a.sampleRate); if(!d) return;
+  const b=a.createBuffer(2,d.length,a.sampleRate), [gl,gr]=panGains(e.pan);
+  const L=b.getChannelData(0), R=b.getChannelData(1);
+  for(let i=0;i<d.length;i++){ L[i]=d[i]*gl; R[i]=d[i]*gr; }
+  const src=a.createBufferSource(); src.buffer=b; src.connect(liveChain(g)); src.start();
+}
+const liveMouse=(e,up)=>livePlay('mouse',e,up);
+const liveKey=(e,up)=>livePlay('kb',e,up);
 function auditionKey(kind){
   const c={key:'a',space:' ',enter:'\n'}[kind], e=keyEvent(c,liveRng,state.kb);
   liveKey(e,false); setTimeout(()=>liveKey(e,true),e.hold*1000);
@@ -658,7 +673,7 @@ function updateStats(){
 }
 
 /* ---------- events ---------- */
-const AUDITION = {speed:1,smooth:1,tone:1,body:1,release:1,hold:1,human:1,depth:1,click:1,
+const AUDITION = {speed:1,smooth:1,tone:1,body:1,click:1,release:1,hold:1,human:1,depth:1,click:1,
                   spaceBoost:'space',spacePitch:'space',enterBoost:'enter',enterPitch:'enter',rattle:'space',spread:1};
 document.addEventListener('input',e=>{
   const el=e.target, g=el.dataset.g, k=el.dataset.k;
