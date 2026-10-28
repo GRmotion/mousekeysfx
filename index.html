@@ -128,6 +128,7 @@ body[data-tab=mouse] [data-only=kb],body[data-tab=kb] [data-only=mouse]{display:
   </aside>
 </main>
 
+<script src="sound-library.js"></script>
 <script>
 (() => {
 'use strict';
@@ -137,34 +138,32 @@ const dB = x => Math.pow(10,x/20);
 
 /* ---------- state ---------- */
 const DEF = {
-  mouse:{preset:'Magic Mouse',speed:65,smooth:65,tone:40,body:55,click:15,release:25,hold:90,human:30,
-         repeat:3,interval:450,double:false,dblgap:110,vol:80,room:10,seed:3},
-  kb:{preset:'Magic Keyboard',speed:70,smooth:55,tone:50,depth:30,click:0,release:35,human:30,
-      spaceBoost:4,spacePitch:-5,enterBoost:3,enterPitch:-3,rattle:40,
+  mouse:{preset:'Recorded',speed:50,smooth:0,tone:50,body:50,click:50,release:50,hold:68,human:25,
+         repeat:3,interval:450,double:false,dblgap:110,vol:80,room:8,noise:40,seed:3},
+  kb:{preset:'Recorded',speed:50,smooth:0,tone:50,depth:50,click:50,release:50,human:35,
+      spaceBoost:3,spacePitch:-2,enterBoost:2,enterPitch:-1,rattle:25,
       text:'Hello world,\nthis is a synthetic typing simulation.\nEvery space and enter has its own weight.\n',
-      duration:18,rhythm:40,burst:35,pauseSpace:40,pauseEnter:200,pausePunct:80,seed:7,
-      vol:80,room:15,spread:35,single:'key'},
+      duration:18,rhythm:55,burst:35,pauseSpace:40,pauseEnter:200,pausePunct:80,seed:7,
+      vol:80,room:8,noise:40,spread:35,single:'key'},
   exp:{sr:44100,bits:'16',ch:'2',norm:true}
 };
 const PRESETS = {
   mouse:{
-    'Magic Mouse':     {speed:65,smooth:65,tone:40,body:55,click:15,release:25,hold:90,human:30},
-    'MacBook trackpad':{speed:70,smooth:60,tone:30,body:70,click:5, release:55,hold:60,human:25},
-    'Microswitch':     {speed:60,smooth:25,tone:55,body:35,click:75,release:60,hold:70,human:30},
-    'Quiet office':    {speed:55,smooth:80,tone:40,body:40,click:35,release:30,hold:80,human:30},
-    Gaming:            {speed:85,smooth:10,tone:68,body:20,click:85,release:70,hold:45,human:20}
+    Recorded:{speed:50,smooth:0, tone:50,body:50,click:50,release:50,hold:68,human:25},
+    Soft:    {speed:58,smooth:40,tone:40,body:62,click:30,release:40,hold:80,human:25},
+    Bright:  {speed:55,smooth:0, tone:62,body:40,click:72,release:55,hold:60,human:25},
+    Heavy:   {speed:45,smooth:15,tone:36,body:76,click:40,release:50,hold:85,human:25}
   },
   kb:{
-    'Magic Keyboard':   {speed:70,smooth:55,tone:50,depth:30,click:0, release:35,human:30},
-    'MacBook Pro':      {speed:74,smooth:50,tone:55,depth:25,click:0, release:40,human:30},
-    'MacBook butterfly':{speed:82,smooth:25,tone:68,depth:20,click:10,release:50,human:30},
-    'Linear thock':     {speed:45,smooth:60,tone:35,depth:75,click:5, release:40,human:35},
-    Tactile:            {speed:55,smooth:45,tone:45,depth:55,click:40,release:45,human:35},
-    'Clicky blue':      {speed:75,smooth:15,tone:60,depth:35,click:100,release:60,human:35}
+    Recorded:       {speed:50,smooth:0, tone:50,depth:50,click:50,release:50,human:35},
+    Muted:          {speed:58,smooth:45,tone:40,depth:60,click:30,release:35,human:35},
+    'Deep thock':   {speed:45,smooth:20,tone:34,depth:80,click:35,release:45,human:35},
+    'Bright clicky':{speed:55,smooth:0, tone:64,depth:35,click:75,release:60,human:35},
+    'Light & fast': {speed:68,smooth:10,tone:58,depth:32,click:55,release:45,human:30}
   }
 };
 const state = JSON.parse(JSON.stringify(DEF));
-const STORE = 'mousekeysfx.v2';
+const STORE = 'mousekeysfx.v3';
 try{
   const saved = JSON.parse(localStorage.getItem(STORE)||'null');
   if(saved) for(const g in state) Object.assign(state[g], saved[g]||{});
@@ -179,12 +178,12 @@ const SOUND_KEYS = {mouse:['speed','smooth','tone','body','click','release','hol
 const SECT = {
   mouse:[
     ['Sound',[
-      S('speed','Snap speed',0,100,'%','Slow, soft decay ↔ fast, tight snap'),
-      S('smooth','Smoothness',0,100,'%','Harsh and crackly ↔ round and soft'),
-      S('tone','Tone',0,100,'%','Low and dull ↔ high and bright'),
-      S('body','Body',0,100,'%','Low thump under the click'),
-      S('click','Switch click',0,100,'%','Sharp micro-switch snap on top of the shell sound'),
-      S('release','Release click',0,100,'%','Level of the button-up click'),
+      S('speed','Decay speed',0,100,'%','Long ring ↔ short, dry click (50 = as recorded)'),
+      S('smooth','Smoothness',0,100,'%','Sharp as recorded ↔ round and soft'),
+      S('tone','Tone',0,100,'%','Lower and darker ↔ higher and brighter (50 = as recorded)'),
+      S('body','Body',0,100,'%','Low-frequency weight (50 = as recorded)'),
+      S('click','Sharpness',0,100,'%','High-frequency snap (50 = as recorded)'),
+      S('release','Release click',0,100,'%','Level of the button-up click (50 = as recorded)'),
       S('hold','Hold time',20,250,' ms','Time between press and release'),
       S('human','Humanize',0,100,'%','Random variation per click')]],
     ['Sequence',[
@@ -192,16 +191,16 @@ const SECT = {
       S('interval','Interval',80,2000,' ms','Time between clicks'),
       'double',
       S('dblgap','Double-click gap',60,300,' ms')]],
-    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb')]]
+    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb'),S('noise','Room noise',0,100,'%','Background hiss of the recording, so silence is not digital zero')]]
   ],
   kb:[
     ['Sound',[
-      S('speed','Snap speed',0,100,'%','Slow, soft decay ↔ fast, tight snap'),
-      S('smooth','Smoothness',0,100,'%','Harsh and crackly ↔ round and soft'),
-      S('tone','Tone',0,100,'%','Low thock ↔ high clack'),
-      S('depth','Depth',0,100,'%','Low-end body of the key bottoming out'),
-      S('click','Switch click',0,100,'%','0 = linear, 40 = tactile, 100 = clicky'),
-      S('release','Release sound',0,100,'%','Level of the key-up sound'),
+      S('speed','Decay speed',0,100,'%','Long ring ↔ short, dry tap (50 = as recorded)'),
+      S('smooth','Smoothness',0,100,'%','Sharp as recorded ↔ round and soft'),
+      S('tone','Tone',0,100,'%','Lower and darker ↔ higher and brighter (50 = as recorded)'),
+      S('depth','Depth',0,100,'%','Low-frequency thock (50 = as recorded)'),
+      S('click','Sharpness',0,100,'%','High-frequency click (50 = as recorded)'),
+      S('release','Release sound',0,100,'%','Level of the key-up sound (50 = as recorded)'),
       S('human','Humanize',0,100,'%','Random velocity and pitch variation')]],
     ['Big keys',[
       S('spaceBoost','Space loudness',-6,12,' dB','Space bar level relative to a normal key'),
@@ -217,7 +216,7 @@ const SECT = {
       S('pauseEnter','Pause after enter',0,600,'%'),
       S('pausePunct','Pause after , . ! ?',0,300,'%'),
       'reroll']],
-    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb'),
+    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb'),S('noise','Room noise',0,100,'%','Background hiss of the recording, so silence is not digital zero'),
                S('spread','Stereo spread',0,100,'%','Pan keys by position on the keyboard')]]
   ]
 };
@@ -311,12 +310,12 @@ function keyX(c,kind){
 }
 function keyEvent(c,rng,p){
   const kind=c===' '?'space':c==='\n'?'enter':'key';
-  const h=(Math.imul(c.codePointAt(0),2654435761)>>>0)%1000/1000;
   return {c,kind,
+    tpl:Math.imul(c.codePointAt(0),2654435761)>>>0,
     vel:clamp(1+gauss(rng)*p.human/100*0.18,0.55,1.4),
-    pit:(1+(h-0.5)*0.08)*(1+gauss(rng)*p.human/100*0.025),
+    pit:1+gauss(rng)*p.human/100*0.02,
     pan:(keyX(c,kind)-0.5)*2*p.spread/100,
-    hold:0.04+rng()*0.05};
+    hold:clamp(0.078+gauss(rng)*0.017,0.045,0.14)};
 }
 function typingEvents(p){
   const rng=mulberry32(p.seed*7919+1);
@@ -328,7 +327,7 @@ function typingEvents(p){
     const prev=chars[i-1];
     if(prev===' '||prev==='\n') wm=Math.exp(gauss(rng)*p.burst/100*0.5);
     const pause = prev===' ' ? p.pauseSpace/100 : prev==='\n' ? p.pauseEnter/100 : /[.,;:!?]/.test(prev) ? p.pausePunct/100 : 0;
-    const g=Math.max(0.2,(1+pause)*wm*Math.exp(gauss(rng)*p.rhythm/100*0.5));
+    const g=Math.max(0.2,(1+pause)*wm*Math.exp(gauss(rng)*p.rhythm/100));
     raw.push(g); sum+=g;
   }
   const k=n>1?p.duration/sum:0;
@@ -341,10 +340,12 @@ function typingEvents(p){
   return evs;
 }
 
-/* ---------- sample-level synthesis ----------
-   Every hit is built sample by sample from damped resonant modes (plastic shell, keycap, plate, switch leaf)
-   plus short filtered noise for the contact. There are no pitch sweeps, which is what made the first
-   version sound like interface beeps. */
+/* ---------- sample-level synthesis from recorded templates ----------
+   Hits are rebuilt from band-by-band loudness envelopes measured on real recordings (36 ERB-spaced bands,
+   0.5 ms resolution) by shaping band-limited noise, plus the ringing resonances measured on the mouse
+   switch. The envelopes are bent by the sliders and randomized per hit, so no two hits are identical. */
+let KB_GAIN=3, MOUSE_GAIN=0.5, CAL=0.80;
+const PRE_MS=1.0;
 function filtInPlace(x,type,f,q,sr){
   const w=2*Math.PI*Math.min(f,sr*0.45)/sr, c=Math.cos(w), s=Math.sin(w), al=s/(2*q), a0=1+al;
   let b0,b1,b2;
@@ -358,112 +359,168 @@ function filtInPlace(x,type,f,q,sr){
     x2=x1;x1=v;y2=y1;y1=y;x[i]=y;
   }
 }
-const newHit=(sr,dur)=>({sr,n:Math.ceil(dur*sr),d:new Float32Array(Math.ceil(dur*sr))});
-function addMode(h,t,f,tau,amp,rng,att=0.0002){
-  const sr=h.sr, i0=Math.floor(t*sr);
-  if(i0>=h.n||amp<=0) return;
-  const len=Math.min(h.n-i0,Math.ceil(tau*7*sr)), w=2*Math.PI*f*(1+(rng()-0.5)*0.04)/sr;
+let LIBD=null;
+function getLib(){
+  if(LIBD) return LIBD;
+  const L=window.SOUND_LIB, nb=L.nb, nf=L.grid.length, per=nf*nb;
+  const dec=k=>{
+    const o=L[k], bin=atob(o.d), u=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+    const tpls=[];
+    for(let i=0;i<o.n;i++){
+      const q=u.subarray(i*per,(i+1)*per), A=new Float32Array(per), mx=new Float32Array(nb);
+      for(let j=0;j<nf;j++) for(let b=0;b<nb;b++){
+        const db=q[j*nb+b]/2-110, a=db<=-104?0:Math.pow(10,db/20);
+        A[j*nb+b]=a; if(a>mx[b]) mx[b]=a;
+      }
+      tpls.push({r:o.r[i],A,mx});
+    }
+    return {tpls,modes:o.modes||null};
+  };
+  LIBD={nb,nf,fc:L.fc,kbDown:dec('kbDown'),kbBig:dec('kbBig'),kbUp:dec('kbUp'),mDown:dec('mDown'),mUp:dec('mUp')};
+  return LIBD;
+}
+const bankCache=new Map();
+function noiseBank(sr){
+  let b=bankCache.get(sr);
+  if(b) return b;
+  const lib=getLib(), rng=mulberry32(4242), len=Math.floor(sr*1.2);
+  b=lib.fc.map(fc=>{
+    const x=new Float32Array(len);
+    for(let i=0;i<len;i++) x[i]=rng()*2-1;
+    filtInPlace(x,'bandpass',fc,fc/(1.6*24.7*(4.37*fc/1000+1)),sr);
+    let e=0; for(let i=2000;i<len;i++) e+=x[i]*x[i];
+    const k=1/Math.sqrt(e/(len-2000)); for(let i=0;i<len;i++) x[i]*=k;
+    return x;
+  });
+  bankCache.set(sr,b);
+  return b;
+}
+function addMode(d,sr,t,f,tau,amp,ph,att=0.0003){
+  const i0=Math.floor(t*sr); if(i0>=d.length) return;
+  const len=Math.min(d.length-i0,Math.ceil(tau*7*sr)), w=2*Math.PI*f/sr;
   const cw=Math.cos(w), sw=Math.sin(w), dec=Math.exp(-1/(tau*sr)), na=Math.max(1,att*sr);
-  const ph=rng()*6.283; let s=Math.sin(ph), c=Math.cos(ph), env=amp*(0.9+rng()*0.2);
+  let s=Math.sin(ph), c=Math.cos(ph), env=amp;
   for(let i=0;i<len;i++){
-    h.d[i0+i]+=env*(i<na?i/na:1)*s;
+    d[i0+i]+=env*(i<na?i/na:1)*s;
     const ns=s*cw+c*sw; c=c*cw-s*sw; s=ns; env*=dec;
   }
 }
-function burst(h,t,dur,amp,rng,type,f,q,att=0.0002){
-  const sr=h.sr, i0=Math.floor(t*sr), len=Math.min(h.n-i0,Math.ceil(dur*sr*5));
-  if(len<=0||amp<=0) return;
-  const x=new Float32Array(len), tau=dur/2.2, na=Math.max(1,att*sr);
-  for(let i=0;i<len;i++) x[i]=(rng()*2-1)*Math.exp(-i/sr/tau)*(i<na?i/na:1);
-  if(type) filtInPlace(x,type,f,q,sr);
-  let pk=0; for(let i=0;i<len;i++) pk=Math.max(pk,Math.abs(x[i]));
-  if(pk<1e-9) return;
-  const k=amp/pk; for(let i=0;i<len;i++) h.d[i0+i]+=x[i]*k;
+function resample(d,r){
+  if(Math.abs(r-1)<0.01) return d;
+  const n=Math.max(1,Math.floor((d.length-20)/r)), o=new Float32Array(n), cut=Math.min(1,1/r), H=8;
+  for(let j=0;j<n;j++){
+    const x=j*r+9, i=Math.floor(x); let v=0;
+    for(let k=-H+1;k<=H;k++){
+      const t=x-(i+k), w=0.5+0.5*Math.cos(Math.PI*t/H), a=Math.PI*t*cut;
+      v+=d[i+k]*(Math.abs(a)<1e-6?cut:Math.sin(a)/(Math.PI*t))*w;
+    }
+    o[j]=v;
+  }
+  return o;
 }
-function finishHit(h,sm,target,vel){
-  const lp=16000*Math.pow(0.2,sm)*clamp(vel,0.6,1.3);
-  filtInPlace(h.d,'lowpass',lp,0.7,h.sr);
-  let pk=0; for(let i=0;i<h.n;i++) pk=Math.max(pk,Math.abs(h.d[i]));
-  if(pk<1e-9) return null;
-  const k=target/pk, fade=Math.min(96,h.n);
-  for(let i=0;i<h.n;i++) h.d[i]*=k*(i>h.n-fade?(h.n-i)/fade:1);
-  return h.d;
+/* o: S time stretch, tilt dB/oct, lf/hf dB, lp Hz, att s, jit dB, db level, st semitones, modes, gain */
+function tplHit(tpl,sr,o,rng){
+  const lib=getLib(), nb=lib.nb, G=window.SOUND_LIB.grid, bank=noiseBank(sr), S=o.S;
+  const N=Math.floor((3+(G[G.length-1]-3)*S)/1000*sr);
+  const j0=new Int32Array(N), fr=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const ms=i/sr*1000, tau=ms<3?ms:3+(ms-3)/S, idx=Math.min(tau<=20?tau/0.5:40+(tau-20)/2,G.length-1.0001);
+    j0[i]=Math.floor(idx); fr[i]=idx-j0[i];
+  }
+  const out=new Float32Array(N), alpha=o.att>0?1-Math.exp(-1/(o.att*sr)):1;
+  let jit=0;
+  for(let b=0;b<nb;b++){
+    const fc=lib.fc[b];
+    jit=jit*0.85+gauss(rng)*o.jit;
+    const g=o.tilt*Math.log2(fc/1500)+o.lf/(1+Math.pow(fc/350,3))+o.hf*(1-1/(1+Math.pow(fc/3000,3)))
+      -(fc>o.lp?12*Math.log2(fc/o.lp):0)+jit+o.db;
+    const gb=Math.pow(10,g/20)*CAL;
+    if(tpl.mx[b]*gb<1e-7) continue;
+    const nz=bank[b], off=2200+Math.floor(rng()*(nz.length-N-2300)), A=tpl.A;
+    let s=0;
+    for(let i=0;i<N;i++){
+      const k=j0[i]*nb+b, a=A[k]+(A[k+nb]-A[k])*fr[i];
+      s+=(a-s)*alpha; out[i]+=nz[off+i]*s*gb;
+    }
+  }
+  if(o.modes) for(const m of o.modes)
+    addMode(out,sr,(PRE_MS+1.5)/1000,m.f*o.fm,m.tau*S,m.amp*Math.pow(10,o.db/20),m.ph+Math.PI/2);
+  const fade=Math.min(128,N);
+  for(let i=N-fade;i<N;i++) out[i]*=(N-i)/fade;
+  return resample(out,Math.pow(2,o.st/12));
 }
-const toneScale=p=>Math.pow(2,(p.tone-50)/50*1.1);
-
 function mouseSynth(p,e,rng,up,sr){
-  const S=Math.pow(2,(50-p.speed)/50*1.2), c=p.click/100, body=p.body/100, F=toneScale(p)*e.pit;
-  const h=newHit(sr,0.35);
-  if(!up){
-    if(c>0){
-      burst(h,0,0.0012*S,c*0.9,rng,'bandpass',3600*F,1.3);
-      addMode(h,0,3300*F,0.0035*S,c*0.45,rng); addMode(h,0,5100*F,0.0025*S,c*0.3,rng);
-    }
-    addMode(h,0.0006,640*F,0.013*S,0.7,rng); addMode(h,0.0006,1210*F,0.009*S,0.45,rng); addMode(h,0.0006,1780*F,0.006*S,0.28,rng);
-    burst(h,0.0004,0.004*S,0.5,rng,'lowpass',900*F,0.8,0.0004);
-    addMode(h,0.001,175*Math.sqrt(F),0.028*S,body*0.9,rng,0.0008);
-  } else {
-    if(c>0) burst(h,0,0.001*S,c*0.6,rng,'bandpass',4200*F,1.3);
-    addMode(h,0.0005,720*F,0.008*S,0.7,rng); addMode(h,0.0005,1350*F,0.006*S,0.4,rng);
-    burst(h,0.0004,0.003*S,0.35,rng,'lowpass',1000*F,0.8,0.0004);
-    addMode(h,0.001,210*Math.sqrt(F),0.016*S,body*0.4,rng,0.0008);
-  }
-  const target=0.55*e.vel*(up?p.release/100*0.7:1);
-  return target<0.005?null:finishHit(h,p.smooth/100,target,e.vel);
+  const lib=getLib(), h=p.human/100, tpl=(up?lib.mUp:lib.mDown).tpls[0];
+  if(up&&p.release<=0) return null;
+  const sm=p.smooth/100;
+  const o={S:Math.pow(2,(50-p.speed)/50*0.9)*(1+gauss(rng)*0.05*h), tilt:(p.tone-50)/50*4,
+    lf:(p.body-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4,
+    db:20*Math.log10(e.vel)+(up?(p.release-50)/50*12:0)+gauss(rng)*h*1.2, st:(p.tone-50)/50*3,
+    fm:1+gauss(rng)*h*0.01, modes:(up?lib.mUp:lib.mDown).modes};
+  const d=tplHit(tpl,sr,o,rng), k=MOUSE_GAIN*(up?1:0.75);   // 0.75: calibrated against the recorded click
+  for(let i=0;i<d.length;i++) d[i]*=k;
+  return d;
 }
-
 function keySynth(p,e,rng,up,sr){
-  const S=Math.pow(2,(50-p.speed)/50*1.2), depth=p.depth/100, c=p.click/100, big=e.kind!=='key';
-  const m = e.kind==='space' ? {f:Math.pow(2,p.spacePitch/12),dec:1.5,gain:dB(p.spaceBoost),thump:1.6}
-          : e.kind==='enter' ? {f:Math.pow(2,p.enterPitch/12),dec:1.25,gain:dB(p.enterBoost),thump:1.3}
-          : {f:1,dec:1,gain:1,thump:1};
-  const F=toneScale(p)*e.pit*m.f, D=S*m.dec, h=newHit(sr,0.45), pl=0.3+0.9*depth;
-  let target;
-  if(!up){
-    // fingertip on keycap, keycap ringing, then plate and case after bottom-out
-    burst(h,0,0.003*D,0.55,rng,'bandpass',1700*F,0.8,0.0004);
-    addMode(h,0.0003,1650*F,0.007*D,0.5,rng,0.0004);
-    addMode(h,0.0003,2480*F,0.005*D,0.32,rng,0.0004);
-    addMode(h,0.0003,3720*F,0.003*D,0.18,rng,0.0004);
-    addMode(h,0.0012,380*F,0.022*D,0.8*pl,rng,0.0008);
-    addMode(h,0.0012,720*F,0.014*D,0.45*pl,rng,0.0008);
-    addMode(h,0.0012,1150*F,0.009*D,0.25*pl,rng,0.0008);
-    addMode(h,0.0012,110*Math.pow(F,0.6),0.035*D,depth*0.9*m.thump,rng,0.001);
-    if(c>0){
-      burst(h,0,0.0012*S,c*0.9,rng,'bandpass',4800*F,1.4);
-      addMode(h,0,3100*F,0.003*S,c*0.5,rng); addMode(h,0,4700*F,0.0022*S,c*0.3,rng);
-      if(p.click>70){ burst(h,0.0055,0.001*S,c*0.6,rng,'bandpass',6200*F,1.6); addMode(h,0.0055,5600*F,0.002*S,c*0.3,rng); }
+  const lib=getLib(), h=p.human/100, sm=p.smooth/100, big=e.kind!=='key';
+  if(up&&p.release<=0) return null;
+  const set=up?lib.kbUp:big?lib.kbBig:lib.kbDown;
+  const pick=(e.tpl+(rng()<h*0.5?1+Math.floor(rng()*3):0)+(e.kind==='enter'?3:0))%set.tpls.length;
+  const bigDb=big?(e.kind==='space'?p.spaceBoost:p.enterBoost):0, bigSt=big?(e.kind==='space'?p.spacePitch:p.enterPitch):0;
+  const o={S:Math.pow(2,(50-p.speed)/50*0.9)*(1+gauss(rng)*0.05*h), tilt:(p.tone-50)/50*4,
+    lf:(p.depth-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4,
+    db:20*Math.log10(KB_GAIN*e.vel)+(up?(p.release-50)/50*12:0)+bigDb+gauss(rng)*h*1.2,
+    st:(p.tone-50)/50*3+bigSt, modes:null};
+  const d=tplHit(set.tpls[pick],sr,o,rng);
+  if(big&&!up&&p.rattle>0){
+    const bank=noiseBank(sr), n=e.kind==='space'?3:2, r=p.rattle/100, amp=set.tpls[pick].r*KB_GAIN*Math.pow(10,bigDb/20)*0.5*r;
+    for(let i=0;i<n;i++){
+      const t0=Math.floor((0.012+i*0.007+rng()*0.01)*sr), len=Math.floor(0.006*sr), off=3000+Math.floor(rng()*20000);
+      for(let j=0;j<len&&t0+j<d.length;j++){
+        let v=0; for(let b=24;b<29;b++) v+=bank[b][off+j];
+        d[t0+j]+=v*0.45*amp*Math.exp(-j/sr/0.0012)*Math.min(1,j/(0.0002*sr));
+      }
     }
-    if(big&&p.rattle>0){
-      const n=e.kind==='space'?3:2, r=p.rattle/100;
-      for(let i=0;i<n;i++) burst(h,0.012+i*0.007+rng()*0.01,0.003,0.22*r,rng,'bandpass',3200+rng()*1500,2.5);
-    }
-    target=0.55*e.vel*m.gain;
-  } else {
-    if(p.release<=0) return null;
-    burst(h,0,0.002*S,0.5,rng,'bandpass',(3200+p.tone*20)*e.pit,1.2);
-    addMode(h,0.0002,1900*F,0.005*D,0.4,rng,0.0003);
-    addMode(h,0.0006,520*F,0.012*D,0.45,rng,0.0006);
-    target=0.55*e.vel*Math.sqrt(m.gain)*p.release/100*0.7;
   }
-  return finishHit(h,p.smooth/100,target,e.vel);
+  return d;
 }
 const synthHit=(g,p,e,rng,up,sr)=>(g==='mouse'?mouseSynth:keySynth)(p,e,rng,up,sr);
 function panGains(pan){ const a=(clamp(pan||0,-1,1)+1)*Math.PI/4; return [Math.cos(a),Math.sin(a)]; }
+// The two microphones of the reference recording are about 15 mm apart: the right channel arrives ~45 us later.
+function stereoHit(d,sr,pan,L,R,o){
+  const [gl,gr]=panGains(pan), dl=0.000045*sr, i0=Math.floor(dl), f=dl-i0;
+  for(let i=0;i<d.length;i++){
+    L[o+i]+=d[i]*gl;
+    const k=o+i+i0; if(k<L.length) R[k]+=d[i]*gr*(1-f); if(k+1<L.length) R[k+1]+=d[i]*gr*f;
+  }
+}
 
+function addNoiseBed(L,R,sr,gain,rng){
+  const bank=noiseBank(sr), fl=window.SOUND_LIB.floor, B=Math.floor(0.6*sr), X=Math.floor(0.005*sr), n=L.length;
+  for(const ch of [L,R]) for(let b=0;b<bank.length;b++){
+    const a=fl[b]*gain, nz=bank[b];
+    for(let s0=0;s0<n;s0+=B-X){
+      const off=2200+Math.floor(rng()*(nz.length-B-2300)), len=Math.min(B,n-s0);
+      for(let i=0;i<len;i++){
+        const w=Math.min(1,i/X,(len-i)/X);
+        ch[s0+i]+=nz[off+i]*a*w;
+      }
+    }
+  }
+}
 /* ---------- rendering ---------- */
 async function renderEvents(g,p,evs,sr,tail=0.8){
   const end=evs.reduce((m,e)=>Math.max(m,e.t+e.hold),0)+tail+(p.room>0?0.4:0);
   const total=Math.max(1,Math.ceil(end*sr)), L=new Float32Array(total), R=new Float32Array(total);
   const rng=mulberry32(p.seed*31+5);
   for(const e of evs){
-    const [gl,gr]=panGains(e.pan);
     for(const up of [false,true]){
       const d=synthHit(g,p,e,rng,up,sr); if(!d) continue;
-      const o=Math.floor((e.t+(up?e.hold:0))*sr), n=Math.min(d.length,total-o);
-      for(let i=0;i<n;i++){ L[o+i]+=d[i]*gl; R[o+i]+=d[i]*gr; }
+      stereoHit(d,sr,e.pan,L,R,Math.floor((e.t+(up?e.hold:0))*sr));
     }
   }
+  if(p.noise>0) addNoiseBed(L,R,sr,(g==='mouse'?1:KB_GAIN)*p.noise/50,rng);
   const dry=new AudioBuffer({numberOfChannels:2,length:total,sampleRate:sr});
   dry.copyToChannel(L,0); dry.copyToChannel(R,1);
   const oc=new OfflineAudioContext(2,total,sr), src=oc.createBufferSource();
@@ -493,7 +550,7 @@ function encodeWAV(buf,bits,mono,norm){
   const ch=[mono?Float32Array.from(L,(v,i)=>(v+R[i])/2):L];
   if(!mono) ch.push(R);
   let gain=1;
-  if(norm){ let pk=0; for(const c of ch) for(let i=0;i<len;i++) pk=Math.max(pk,Math.abs(c[i])); if(pk>0) gain=dB(-1)/pk; }
+  if(norm){ let pk=0; for(const c of ch) for(let i=0;i<len;i++){ const v=Math.abs(c[i]); if(v>pk) pk=v; } if(pk>0) gain=dB(-1)/pk; }
   const flt=bits==='32f', bps=flt?32:+bits, bpf=bps/8;
   const dataLen=len*nch*bpf, extra=flt?12:0;
   const ab=new ArrayBuffer(44+extra+dataLen), v=new DataView(ab);
@@ -579,9 +636,8 @@ function liveChain(g){
 const liveRng = Math.random;
 function livePlay(g,e,up){
   const a=getAC(), d=synthHit(g,state[g],e,liveRng,up,a.sampleRate); if(!d) return;
-  const b=a.createBuffer(2,d.length,a.sampleRate), [gl,gr]=panGains(e.pan);
-  const L=b.getChannelData(0), R=b.getChannelData(1);
-  for(let i=0;i<d.length;i++){ L[i]=d[i]*gl; R[i]=d[i]*gr; }
+  const b=a.createBuffer(2,d.length+4,a.sampleRate);
+  stereoHit(d,a.sampleRate,e.pan,b.getChannelData(0),b.getChannelData(1),0);
   const src=a.createBufferSource(); src.buffer=b; src.connect(liveChain(g)); src.start();
 }
 const liveMouse=(e,up)=>livePlay('mouse',e,up);
