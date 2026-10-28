@@ -24,6 +24,7 @@ Hits are rebuilt sample by sample from measured data, not from beeps or oscillat
 
 ## Features
 
+- **Output**: volume, noise reduction (expander on the quiet tails), room reverb, optional background noise of the original recording (off by default).
 - **Mouse**: presets (Recorded, Soft, Bright, Heavy), decay speed, smoothness, tone, body, sharpness, release click,
   hold time, humanize, click sequence / double click.
 - **Keyboard**: presets (Recorded, Muted, Deep thock, Bright clicky, Light & fast); space and enter loudness, pitch

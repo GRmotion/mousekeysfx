@@ -36,9 +36,10 @@ header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-
 .tabs button[aria-selected=true]{background:var(--accent);color:var(--accent-ink)}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:16px;max-width:1200px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));align-items:start}
 @media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.stage{order:-1}}
-.stage{position:sticky;top:12px;display:grid;gap:16px}
-@media (max-width:900px){.stage{position:static}}
-.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+.stage{position:sticky;top:12px;display:grid;gap:16px;max-height:calc(100vh - 24px);overflow-y:auto;overscroll-behavior:contain}
+@media (max-width:900px){.stage{position:static;max-height:none;overflow:visible}}
+.panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.col{display:grid;gap:16px;align-content:start;min-width:0}
 .panel[hidden]{display:none}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .card h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
@@ -69,6 +70,9 @@ canvas#scope{width:100%;height:150px;display:block;background:var(--panel2);bord
 .stats{color:var(--muted);font-size:12px;margin:-2px 0 10px}
 body[data-tab=mouse] [data-only=kb],body[data-tab=kb] [data-only=mouse]{display:none!important}
 .hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+/* panel columns collapse where they would get narrower than ~280px */
+@media (max-width:1100px) and (min-width:901px){.panel{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:600px){.panel{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body data-tab="mouse">
@@ -139,12 +143,12 @@ const dB = x => Math.pow(10,x/20);
 /* ---------- state ---------- */
 const DEF = {
   mouse:{preset:'Recorded',speed:50,smooth:0,tone:50,body:50,click:50,release:50,hold:68,human:25,
-         repeat:3,interval:450,double:false,dblgap:110,vol:80,room:8,noise:40,seed:3},
+         repeat:3,interval:450,double:false,dblgap:110,vol:80,denoise:50,room:8,noise:0,seed:3},
   kb:{preset:'Recorded',speed:50,smooth:0,tone:50,depth:50,click:50,release:50,human:35,
       spaceBoost:3,spacePitch:-2,enterBoost:2,enterPitch:-1,rattle:25,
       text:'Hello world,\nthis is a synthetic typing simulation.\nEvery space and enter has its own weight.\n',
       duration:18,rhythm:55,burst:35,pauseSpace:40,pauseEnter:200,pausePunct:80,seed:7,
-      vol:80,room:8,noise:40,spread:35,single:'key'},
+      vol:80,denoise:50,room:8,noise:0,spread:35,single:'key'},
   exp:{sr:44100,bits:'16',ch:'2',norm:true}
 };
 const PRESETS = {
@@ -163,7 +167,7 @@ const PRESETS = {
   }
 };
 const state = JSON.parse(JSON.stringify(DEF));
-const STORE = 'mousekeysfx.v3';
+const STORE = 'mousekeysfx.v4';
 try{
   const saved = JSON.parse(localStorage.getItem(STORE)||'null');
   if(saved) for(const g in state) Object.assign(state[g], saved[g]||{});
@@ -177,7 +181,7 @@ const SOUND_KEYS = {mouse:['speed','smooth','tone','body','click','release','hol
                     kb:['speed','smooth','tone','depth','click','release','human']};
 const SECT = {
   mouse:[
-    ['Sound',[
+    ['Sound',0,[
       S('speed','Decay speed',0,100,'%','Long ring ↔ short, dry click (50 = as recorded)'),
       S('smooth','Smoothness',0,100,'%','Sharp as recorded ↔ round and soft'),
       S('tone','Tone',0,100,'%','Lower and darker ↔ higher and brighter (50 = as recorded)'),
@@ -186,15 +190,15 @@ const SECT = {
       S('release','Release click',0,100,'%','Level of the button-up click (50 = as recorded)'),
       S('hold','Hold time',20,250,' ms','Time between press and release'),
       S('human','Humanize',0,100,'%','Random variation per click')]],
-    ['Sequence',[
+    ['Sequence',1,[
       S('repeat','Clicks',1,30),
       S('interval','Interval',80,2000,' ms','Time between clicks'),
       'double',
       S('dblgap','Double-click gap',60,300,' ms')]],
-    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb'),S('noise','Room noise',0,100,'%','Background hiss of the recording, so silence is not digital zero')]]
+    ['Output',1,[S('vol','Volume',0,100,'%'),S('denoise','Noise reduction',0,100,'%','Removes the hiss tails after each hit'),S('room','Room',0,100,'%','Short synthetic room reverb'),S('noise','Background noise',0,100,'%','Hiss of the original recording; 0 = clean silence')]]
   ],
   kb:[
-    ['Sound',[
+    ['Sound',0,[
       S('speed','Decay speed',0,100,'%','Long ring ↔ short, dry tap (50 = as recorded)'),
       S('smooth','Smoothness',0,100,'%','Sharp as recorded ↔ round and soft'),
       S('tone','Tone',0,100,'%','Lower and darker ↔ higher and brighter (50 = as recorded)'),
@@ -202,13 +206,13 @@ const SECT = {
       S('click','Sharpness',0,100,'%','High-frequency click (50 = as recorded)'),
       S('release','Release sound',0,100,'%','Level of the key-up sound (50 = as recorded)'),
       S('human','Humanize',0,100,'%','Random velocity and pitch variation')]],
-    ['Big keys',[
+    ['Big keys',0,[
       S('spaceBoost','Space loudness',-6,12,' dB','Space bar level relative to a normal key'),
       S('spacePitch','Space pitch',-12,4,' st','Lower = bigger, deeper key'),
       S('enterBoost','Enter loudness',-6,12,' dB'),
       S('enterPitch','Enter pitch',-12,4,' st'),
       S('rattle','Stabilizer rattle',0,100,'%','Wire rattle on space and enter')]],
-    ['Typing',['text',
+    ['Typing',1,['text',
       S('duration','Typing duration',1,120,' s','Time from the first to the last keystroke'),
       S('rhythm','Rhythm variation',0,100,'%','Random timing between keys'),
       S('burst','Burstiness',0,100,'%','Words typed at different speeds'),
@@ -216,7 +220,8 @@ const SECT = {
       S('pauseEnter','Pause after enter',0,600,'%'),
       S('pausePunct','Pause after , . ! ?',0,300,'%'),
       'reroll']],
-    ['Output',[S('vol','Volume',0,100,'%'),S('room','Room',0,100,'%','Short synthetic room reverb'),S('noise','Room noise',0,100,'%','Background hiss of the recording, so silence is not digital zero'),
+    ['Output',1,[S('vol','Volume',0,100,'%'),S('denoise','Noise reduction',0,100,'%','Removes the hiss tails after each hit'),S('room','Room',0,100,'%','Short synthetic room reverb'),
+               S('noise','Background noise',0,100,'%','Hiss of the original recording; 0 = clean silence'),
                S('spread','Stereo spread',0,100,'%','Pan keys by position on the keyboard')]]
   ]
 };
@@ -226,9 +231,10 @@ function buildPanel(g){
   DEFS[g] = {};
   const presetCard = `<div class="card"><h2>${g==='mouse'?'Click type':'Switch type'}</h2>
     <select data-g="${g}" data-k="preset">${Object.keys(PRESETS[g]).map(n=>`<option>${n}</option>`).join('')}<option>Custom</option></select></div>`;
-  let html = presetCard;
-  for(const [title,items] of SECT[g]){
-    html += `<div class="card"><h2>${title}</h2>`;
+  const cols = ['',''];
+  cols[0] += presetCard;
+  for(const [title,col,items] of SECT[g]){
+    let html = `<div class="card"><h2>${title}</h2>`;
     for(const d of items){
       if(d==='double') html += `<label class="chk"><input type="checkbox" data-g="mouse" data-k="double"> Double click</label>`;
       else if(d==='text') html += `<label class="ctl"><span class="lbl">Text to type</span><textarea data-g="kb" data-k="text" spellcheck="false"></textarea></label>
@@ -240,8 +246,9 @@ function buildPanel(g){
           <input type="range" data-g="${g}" data-k="${d.k}" min="${d.min}" max="${d.max}" step="${d.step}"></label>`;
       }
     }
-    html += `</div>`;
+    cols[col] += html + `</div>`;
   }
+  const html = `<div class="col">${cols[0]}</div><div class="col">${cols[1]}</div>`;
   el.innerHTML = html;
 }
 buildPanel('mouse'); buildPanel('kb');
@@ -373,7 +380,7 @@ function getLib(){
         const db=q[j*nb+b]/2-110, a=db<=-104?0:Math.pow(10,db/20);
         A[j*nb+b]=a; if(a>mx[b]) mx[b]=a;
       }
-      tpls.push({r:o.r[i],A,mx});
+      tpls.push({r:o.r[i],A,mx,peak:Math.max(...mx)});
     }
     return {tpls,modes:o.modes||null};
   };
@@ -438,9 +445,11 @@ function tplHit(tpl,sr,o,rng){
     const gb=Math.pow(10,g/20)*CAL;
     if(tpl.mx[b]*gb<1e-7) continue;
     const nz=bank[b], off=2200+Math.floor(rng()*(nz.length-N-2300)), A=tpl.A;
+    const thr=tpl.peak*Math.pow(10,-(60-45*o.nr)/20);   // noise reduction: 2:1 expander below a threshold set against the loudest band
     let s=0;
     for(let i=0;i<N;i++){
-      const k=j0[i]*nb+b, a=A[k]+(A[k+nb]-A[k])*fr[i];
+      const k=j0[i]*nb+b; let a=A[k]+(A[k+nb]-A[k])*fr[i];
+      if(a<thr) a*=a/thr;
       s+=(a-s)*alpha; out[i]+=nz[off+i]*s*gb;
     }
   }
@@ -455,7 +464,7 @@ function mouseSynth(p,e,rng,up,sr){
   if(up&&p.release<=0) return null;
   const sm=p.smooth/100;
   const o={S:Math.pow(2,(50-p.speed)/50*0.9)*(1+gauss(rng)*0.05*h), tilt:(p.tone-50)/50*4,
-    lf:(p.body-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4,
+    lf:(p.body-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4, nr:p.denoise/100,
     db:20*Math.log10(e.vel)+(up?(p.release-50)/50*12:0)+gauss(rng)*h*1.2, st:(p.tone-50)/50*3,
     fm:1+gauss(rng)*h*0.01, modes:(up?lib.mUp:lib.mDown).modes};
   const d=tplHit(tpl,sr,o,rng), k=MOUSE_GAIN*(up?1:0.75);   // 0.75: calibrated against the recorded click
@@ -469,7 +478,7 @@ function keySynth(p,e,rng,up,sr){
   const pick=(e.tpl+(rng()<h*0.5?1+Math.floor(rng()*3):0)+(e.kind==='enter'?3:0))%set.tpls.length;
   const bigDb=big?(e.kind==='space'?p.spaceBoost:p.enterBoost):0, bigSt=big?(e.kind==='space'?p.spacePitch:p.enterPitch):0;
   const o={S:Math.pow(2,(50-p.speed)/50*0.9)*(1+gauss(rng)*0.05*h), tilt:(p.tone-50)/50*4,
-    lf:(p.depth-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4,
+    lf:(p.depth-50)/50*10, hf:(p.click-50)/50*10, lp:20000*Math.pow(0.15,sm), att:sm*0.0015, jit:h*1.4, nr:p.denoise/100,
     db:20*Math.log10(KB_GAIN*e.vel)+(up?(p.release-50)/50*12:0)+bigDb+gauss(rng)*h*1.2,
     st:(p.tone-50)/50*3+bigSt, modes:null};
   const d=tplHit(set.tpls[pick],sr,o,rng);
