@@ -4,7 +4,9 @@ CEP panel (After Effects 2019 and newer). Pick a preset, press **Add to comp**:
 
 - **Mouse**: preset, number of clicks. A layer with the clicks is added at the current time, above the selected layer
   if there is one. Layer markers show the exact moment of every click.
-- **Keyboard**: preset, text, tempo (WPM). Same placement, one marker per keystroke (letter, Space, Enter).
+- **Keyboard**: preset, text, and tempo (WPM) or duration (set either, the other follows). Same placement, no markers.
+- **Preview** plays the sound in the panel; **Add to comp** adds exactly the take you last previewed.
+- The result message appears above the buttons, stays for 5 seconds and fades out.
 - **Customize** (next to the preset) opens collapsible cards with every parameter.
 - Sounds are rendered in the panel and saved as WAV files in an `sfx` folder next to the project file
   (the project has to be saved once). They are also imported into an `sfx` folder in the Project panel.
@@ -21,7 +23,7 @@ sign.bat                             # same on Windows
 `sign.sh` / `sign.bat` need Adobe's [ZXPSignCmd](https://github.com/Adobe-CEP/CEP-Resources/tree/master/ZXPSignCMD).
 They create a self-signed certificate on first run, or use the `.p12` you pass in (never commit it; `certs/` is ignored).
 
-Signed release: `releases/MouseKeysFX-1.0.0.zxp` (self-signed, no timestamp).
+Signed release: `releases/MouseKeysFX-1.1.0.zxp` (self-signed, no timestamp).
 
 Install the `.zxp` with a ZXP installer (for example aescripts ZXP Installer or Anastasiy's Extension Manager),
 then open *Window > Extensions > MouseKeysFX*.

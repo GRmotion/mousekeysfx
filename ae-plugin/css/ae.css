@@ -37,7 +37,7 @@ select option{background:var(--field);color:var(--text)}
 .btn:hover{background:var(--btn-hover)}
 .btn:active{filter:brightness(.9)}
 .btn[aria-expanded=true]{background:var(--btn-hover);border-color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);height:22px;font-weight:600;width:100%}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
 .btn.primary:hover{background:var(--accent-hover)}
 .btn[disabled]{opacity:.5;pointer-events:none}
 
@@ -63,7 +63,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height
 input[type=range]:focus::-webkit-slider-thumb,input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
 
 .foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:4px}
-#status{min-height:14px;color:var(--muted);overflow-wrap:anywhere}
+#status{min-height:15px;color:var(--muted);overflow-wrap:anywhere;opacity:1;transition:opacity .6s ease}
 #status.err{color:var(--err)}
 #status.ok{color:var(--text)}
+#status.fade{opacity:0}
+.btns{display:flex;gap:6px}
+.btns .btn{flex:0 0 auto;height:22px}
+.btns .btn.primary{flex:1 1 auto;width:auto}
 [hidden]{display:none!important}
+input.derived{color:var(--muted);border-color:var(--line-soft)}

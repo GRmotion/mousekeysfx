@@ -37,15 +37,23 @@
     </div>
     <div class="row">
       <label for="kb-wpm">Tempo</label>
-      <input type="number" id="kb-wpm" min="10" max="300" step="1">
-      <span class="unit" id="kb-info">WPM</span>
+      <input type="number" id="kb-wpm" min="10" max="400" step="1">
+      <span class="unit">WPM</span>
+    </div>
+    <div class="row">
+      <label for="kb-dur">Duration</label>
+      <input type="number" id="kb-dur" min="0.2" max="600" step="0.1">
+      <span class="unit">s</span>
     </div>
     <div class="cards" id="kb-cards" hidden></div>
   </section>
 
   <div class="foot">
-    <button class="btn primary" id="add">Add to comp</button>
     <div id="status" role="status"></div>
+    <div class="btns">
+      <button class="btn" id="preview">Preview</button>
+      <button class="btn primary" id="add">Add to comp</button>
+    </div>
   </div>
 </div>
 <script src="js/cs.js"></script>

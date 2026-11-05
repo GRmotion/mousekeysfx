@@ -10,6 +10,8 @@ var STORE = 'mousekeysfx.ae.v1';
 var state = { mode: 'mouse', mouse: JSON.parse(JSON.stringify(DEF.mouse)), kb: JSON.parse(JSON.stringify(DEF.kb)) };
 state.mouse.repeat = 3;
 state.kb.wpm = 60;
+state.kb.dur = 6;
+state.kb.by = 'wpm';   // which of tempo / duration the user set last
 state.kb.text = 'Hello world, this is a typing test.';
 try {
   var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
@@ -75,25 +77,32 @@ function sync() {
   });
   $('mouse-repeat').value = state.mouse.repeat;
   $('kb-text').value = state.kb.text;
-  $('kb-wpm').value = state.kb.wpm;
+  if (state.kb.by === 'wpm') setVal($('kb-wpm'), state.kb.wpm); else setVal($('kb-dur'), state.kb.dur);
   updateInfo();
 }
 
+function setVal(el, v) { if (el.value !== String(v)) el.value = v; }
+function charCount() { return Array.from(state.kb.text.replace(/\r/g, '')).length; }
+// Tempo and duration are two views of one number: whichever was set last is the source, the other is derived.
 function typingSeconds() {
-  var n = Array.from(state.kb.text.replace(/\r/g, '')).length;
-  return n > 1 ? (n - 1) / (state.kb.wpm * 5 / 60) : 0;
+  var n = charCount();
+  if (n < 2) return 0;
+  return state.kb.by === 'dur' ? state.kb.dur : (n - 1) / (state.kb.wpm * 5 / 60);
 }
 function updateInfo() {
-  var d = typingSeconds();
-  $('kb-info').textContent = d ? 'WPM  ·  ' + d.toFixed(1) + ' s' : 'WPM';
+  var n = charCount(), d = typingSeconds();
+  if (n > 1 && state.kb.by === 'wpm') setVal($('kb-dur'), d.toFixed(1));
+  if (n > 1 && state.kb.by === 'dur') setVal($('kb-wpm'), Math.round((n - 1) * 12 / state.kb.dur));
+  $('kb-wpm').classList.toggle('derived', state.kb.by === 'dur');
+  $('kb-dur').classList.toggle('derived', state.kb.by === 'wpm');
 }
 
 function setMode(m) {
+  stopPreview();
   state.mode = m;
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) { t.classList.toggle('on', t.dataset.mode === m); });
   $('mouse').hidden = m !== 'mouse';
   $('kb').hidden = m !== 'kb';
-  $('add').textContent = 'Add to comp';
   status('');
   save();
 }
@@ -118,8 +127,18 @@ function applySkin() {
   if (env.appSkinInfo.baseFontSize) r.setProperty('--size', Math.max(10, Math.min(14, env.appSkinInfo.baseFontSize)) + 'px');
 }
 
-/* ---------- status ---------- */
-function status(msg, cls) { var s = $('status'); s.textContent = msg || ''; s.className = cls || ''; }
+/* ---------- status: success shows for 5 s, then fades out; errors stay until the next action ---------- */
+var statusTimer = null;
+function status(msg, cls) {
+  var s = $('status');
+  clearTimeout(statusTimer);
+  s.textContent = msg || '';
+  s.className = cls || '';
+  if (cls === 'ok') statusTimer = setTimeout(function () {
+    s.classList.add('fade');
+    statusTimer = setTimeout(function () { s.textContent = ''; s.className = ''; }, 650);
+  }, 5000);
+}
 
 /* ---------- add to comp ---------- */
 function evalHost(script) { return new Promise(function (res) { CS.evalScript(script, res); }); }
@@ -148,50 +167,87 @@ function writeFile(dir, name, buf) {
 }
 function ascii(json) { return json.replace(/[\u0080-￿]/g, function (c) { return '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4); }); }
 
-function markerLabel(e, mode, i) {
-  if (mode === 'mouse') return 'Click ' + (i + 1);
-  return e.kind === 'space' ? 'Space' : e.kind === 'enter' ? 'Enter' : e.c;
+var busy = false, take = null, player = null;
+
+function takeKey(g) { return JSON.stringify([g, state[g], g === 'kb' ? typingSeconds() : 0]); }
+
+// Renders one take (events + audio). Preview and Add share it, so what you hear is what gets added.
+async function renderTake(g) {
+  var p = Object.assign({}, state[g]);
+  p.seed = Math.floor(Math.random() * 100000);
+  if (g === 'kb') {
+    if (!p.text.replace(/\s/g, '').length) throw new Error('Type some text first.');
+    p.duration = Math.max(0.2, typingSeconds());
+  }
+  var evs = g === 'mouse' ? mouseEvents(p) : typingEvents(p);
+  var out = await renderEvents(g, p, evs, SR);
+  take = { key: takeKey(g), g: g, evs: evs, buffer: out.buffer };
+  return take;
 }
 
-var busy = false;
+function stopPreview() {
+  if (player) { try { player.src.onended = null; player.src.stop(); } catch (e) {} player = null; }
+  $('preview').textContent = 'Preview';
+}
+async function preview() {
+  if (busy) return;
+  if (player) { stopPreview(); return; }
+  busy = true; $('preview').disabled = true; $('add').disabled = true; status('Rendering\u2026');
+  try {
+    await new Promise(function (r) { setTimeout(r, 30); });
+    var t = await renderTake(state.mode);
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = (preview.ctx = preview.ctx || new AC());
+    if (ctx.resume) ctx.resume();
+    var src = ctx.createBufferSource();
+    src.buffer = t.buffer; src.connect(ctx.destination);
+    src.onended = function () { if (player && player.src === src) stopPreview(); };
+    player = { src: src, ctx: ctx };
+    src.start();
+    $('preview').textContent = 'Stop';
+    status('');
+  } catch (e) {
+    status(e.message || String(e), 'err');
+  } finally {
+    busy = false; $('preview').disabled = false; $('add').disabled = false;
+  }
+}
+
 async function add() {
   if (busy) return;
   var g = state.mode, kind = g === 'mouse' ? 'click' : 'typing';
-  busy = true; $('add').disabled = true; status('Checking the scene…');
+  busy = true; $('add').disabled = true; $('preview').disabled = true; status('Checking the scene\u2026');
   try {
     var prep = (await evalHost('MKFX.prepare("' + kind + '")')).split('|');
     if (prep[0] !== 'ok') throw new Error(prep.slice(1).join('|') || 'After Effects did not answer.');
     var dir = prep[1], name = prep[2];
 
-    status('Rendering…');
-    await new Promise(function (r) { setTimeout(r, 30); });
-    var p = Object.assign({}, state[g]);
-    p.seed = Math.floor(Math.random() * 100000);
-    if (g === 'kb') {
-      if (!p.text.replace(/\s/g, '').length) throw new Error('Type some text first.');
-      p.duration = Math.max(0.2, typingSeconds());
+    var t = (take && take.g === g && take.key === takeKey(g)) ? take : null;
+    if (!t) {
+      status('Rendering\u2026');
+      await new Promise(function (r) { setTimeout(r, 30); });
+      t = await renderTake(g);
     }
-    var evs = g === 'mouse' ? mouseEvents(p) : typingEvents(p);
-    var out = await renderEvents(g, p, evs, SR);
-    var buf = await blobBytes(encodeWAV(out.buffer, '16', false, false));
+    var buf = await blobBytes(encodeWAV(t.buffer, '16', false, false));
 
-    status('Writing sfx/' + name + '…');
+    status('Writing sfx/' + name + '\u2026');
     var path = await writeFile(dir, name, buf);
 
-    var first = evs[0].t;
-    var payload = {
+    var evs = t.evs, payload = {
       path: path,
-      first: first,
+      first: evs[0].t,
       layerName: g === 'mouse' ? 'Mouse clicks' : 'Typing: ' + state.kb.text.replace(/\s+/g, ' ').slice(0, 24),
-      markers: evs.map(function (e, i) { return { t: e.t, label: markerLabel(e, g, i) }; })
+      // markers only for clicks; the typing layer stays clean
+      markers: g === 'mouse' ? evs.map(function (e, i) { return { t: e.t, label: 'Click ' + (i + 1) }; }) : []
     };
     var res = (await evalHost('MKFX.add(' + JSON.stringify(ascii(JSON.stringify(payload))) + ')')).split('|');
     if (res[0] !== 'ok') throw new Error(res.slice(1).join('|') || 'After Effects did not answer.');
+    take = null;
     status('Added sfx/' + res[1], 'ok');
   } catch (e) {
     status(e.message || String(e), 'err');
   } finally {
-    busy = false; $('add').disabled = false;
+    busy = false; $('add').disabled = false; $('preview').disabled = false;
   }
 }
 
@@ -205,13 +261,14 @@ document.addEventListener('input', function (e) {
   }
   if (el.id === 'mouse-repeat') state.mouse.repeat = Math.max(1, Math.min(50, Math.round(+el.value) || 1));
   else if (el.id === 'kb-text') state.kb.text = el.value;
-  else if (el.id === 'kb-wpm') state.kb.wpm = Math.max(10, Math.min(300, Math.round(+el.value) || 60));
+  else if (el.id === 'kb-wpm') { state.kb.wpm = Math.max(10, Math.min(400, Math.round(+el.value) || 60)); state.kb.by = 'wpm'; }
+  else if (el.id === 'kb-dur') { state.kb.dur = Math.max(0.2, Math.min(600, +el.value || 6)); state.kb.by = 'dur'; }
   else return;
   updateInfo(); save();
 });
 document.addEventListener('change', function (e) {
   var el = e.target;
-  if (el.id === 'mouse-repeat' || el.id === 'kb-wpm') sync();
+  if (el.id === 'mouse-repeat' || el.id === 'kb-wpm' || el.id === 'kb-dur') sync();
   ['mouse', 'kb'].forEach(function (g) {
     if (el.id === g + '-preset' && PRESETS[g][el.value]) { Object.assign(state[g], PRESETS[g][el.value]); state[g].preset = el.value; sync(); save(); }
   });
@@ -223,6 +280,7 @@ document.addEventListener('click', function (e) {
     var cards = $(t.id.replace('custom', 'cards')), open = cards.hidden;
     cards.hidden = !open; t.setAttribute('aria-expanded', String(open));
   } else if (t.id === 'add') add();
+  else if (t.id === 'preview') preview();
 });
 
 /* ---------- init ---------- */
