@@ -1,0 +1,4 @@
+*.p12
+ae-plugin/build/
+ae-plugin/certs/
+ae-plugin/dist/

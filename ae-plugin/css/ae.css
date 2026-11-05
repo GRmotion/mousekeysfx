@@ -1,0 +1,69 @@
+/* After Effects native look. Colors are overwritten at runtime from the host skin (see applySkin in main.js);
+   these values are the default AE dark theme. */
+:root{
+  --bg:#232323; --field:#1a1a1a; --btn:#383838; --btn-hover:#444; --line:#4a4a4a; --line-soft:#2e2e2e;
+  --text:#cfcfcf; --muted:#8e8e8e; --accent:#2d8ceb; --accent-hover:#4a9df0; --accent-text:#fff; --err:#e8714f;
+  --font:"Adobe Clean","Segoe UI",-apple-system,"Helvetica Neue",Arial,sans-serif; --size:11px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:var(--size)/1.3 var(--font);-webkit-user-select:none;user-select:none;overflow-x:hidden}
+#app{padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px;min-height:100%}
+
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line-soft);margin:-2px -10px 2px;padding:0 10px}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:inherit;padding:4px 10px 5px;margin-bottom:-1px;cursor:default}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--text);border-bottom-color:var(--accent)}
+
+.mode{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;align-items:center;gap:6px;min-height:20px}
+.row.top{align-items:flex-start}
+.row>label{flex:0 0 46px;color:var(--muted)}
+.row>select,.row>textarea,.row>input[type=number]{flex:1 1 auto;min-width:0}
+.row>input[type=number]{flex:0 0 64px}
+.unit{color:var(--muted)}
+
+select,input[type=number],textarea,.btn{font:inherit;color:var(--text);border-radius:2px;outline:none}
+select,input[type=number],textarea{background:var(--field);border:1px solid var(--line);height:20px;padding:0 6px;-webkit-user-select:text;user-select:text}
+textarea{height:auto;min-height:46px;padding:4px 6px;resize:vertical;line-height:1.35}
+select{-webkit-appearance:none;appearance:none;padding-right:18px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 9px) 8px,calc(100% - 5px) 8px;background-size:4px 4px,4px 4px;background-repeat:no-repeat}
+input[type=number]::-webkit-inner-spin-button{display:none}
+select:focus,input:focus,textarea:focus,.btn:focus-visible{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+select option{background:var(--field);color:var(--text)}
+
+.btn{background:var(--btn);border:1px solid var(--line);height:20px;padding:0 10px;cursor:default;white-space:nowrap}
+.btn:hover{background:var(--btn-hover)}
+.btn:active{filter:brightness(.9)}
+.btn[aria-expanded=true]{background:var(--btn-hover);border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);height:22px;font-weight:600;width:100%}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn[disabled]{opacity:.5;pointer-events:none}
+
+/* customize cards (twirl-down groups) */
+.cards{display:flex;flex-direction:column;border-top:1px solid var(--line-soft);margin:2px 0 0}
+.card{border-bottom:1px solid var(--line-soft)}
+.card>summary{list-style:none;display:flex;align-items:center;gap:5px;height:22px;cursor:default;color:var(--text)}
+.card>summary::-webkit-details-marker{display:none}
+.card>summary::before{content:"";width:0;height:0;border-left:4px solid var(--muted);border-top:3px solid transparent;border-bottom:3px solid transparent;transition:transform .08s}
+.card[open]>summary::before{transform:rotate(90deg)}
+.card>summary:hover{color:#fff}
+.card .body{padding:2px 0 8px 9px;display:flex;flex-direction:column;gap:3px}
+.srow{display:grid;grid-template-columns:minmax(64px,40%) 1fr 30px;align-items:center;gap:6px;min-height:18px}
+.srow span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow output{text-align:right;color:var(--accent);font-variant-numeric:tabular-nums}
+.chk{display:flex;align-items:center;gap:6px;color:var(--muted);min-height:18px}
+.chk input{margin:0;accent-color:var(--accent)}
+.rowbtn{display:flex;margin-top:2px}
+
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;margin:0;height:14px;width:100%;min-width:0}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:12px;margin-top:-5px;background:var(--text);border-radius:1px}
+input[type=range]:focus::-webkit-slider-thumb,input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
+
+.foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:4px}
+#status{min-height:14px;color:var(--muted);overflow-wrap:anywhere}
+#status.err{color:var(--err)}
+#status.ok{color:var(--text)}
+[hidden]{display:none!important}
