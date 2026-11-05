@@ -21,6 +21,8 @@ sign.bat                             # same on Windows
 `sign.sh` / `sign.bat` need Adobe's [ZXPSignCmd](https://github.com/Adobe-CEP/CEP-Resources/tree/master/ZXPSignCMD).
 They create a self-signed certificate on first run, or use the `.p12` you pass in (never commit it; `certs/` is ignored).
 
+Signed release: `releases/MouseKeysFX-1.0.0.zxp` (self-signed, no timestamp).
+
 Install the `.zxp` with a ZXP installer (for example aescripts ZXP Installer or Anastasiy's Extension Manager),
 then open *Window > Extensions > MouseKeysFX*.
 
